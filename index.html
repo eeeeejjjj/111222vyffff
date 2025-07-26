@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Node.js OTP Auth Server - External Client Demo</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            display: flex; 
+            flex-direction: column;
+            justify-content: center; 
+            align-items: center; 
+            min-height: 100vh; 
+            background-color: #f4f4f4; 
+            margin: 0; 
+            color: #333;
+        }
+        .container { 
+            background: white; 
+            padding: 40px; 
+            border-radius: 8px; 
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1); 
+            text-align: center; 
+            max-width: 500px; 
+            width: 90%; 
+            margin-bottom: 20px;
+        }
+        h1 { 
+            color: #333; 
+            margin-bottom: 20px; 
+        }
+        p {
+            color: #666;
+            margin-bottom: 25px;
+        }
+        label { 
+            display: block; 
+            margin-bottom: 8px; 
+            font-weight: bold; 
+            color: #555; 
+            text-align: left;
+        }
+        input[type="email"], input[type="text"], input[type="password"] { 
+            width: calc(100% - 22px);
+            padding: 10px; 
+            margin-bottom: 15px; 
+            border: 1px solid #ddd; 
+            border-radius: 4px; 
+            font-size: 16px; 
+        }
+        button { 
+            background-color: #007bff; 
+            color: white; 
+            padding: 12px 25px; 
+            border: none; 
+            border-radius: 5px; 
+            cursor: pointer; 
+            font-size: 18px; 
+            transition: background-color 0.3s ease; 
+            margin-top: 10px;
+        }
+        button:hover { 
+            background-color: #0056b3; 
+        }
+        #responseContainer { 
+            margin-top: 30px; 
+        }
+        .loading-message {
+            color: #007bff;
+            font-style: italic;
+        }
+        .error-message {
+            color: red;
+            font-weight: bold;
+        }
+        .success-message {
+            color: green;
+            font-weight: bold;
+        }
+        .info-message {
+            color: #004085;
+            font-weight: bold;
+        }
+        .section-title {
+            margin-top: 40px;
+            margin-bottom: 20px;
+            color: #007bff;
+        }
+        pre {
+            background-color: #eee;
+            padding: 10px;
+            border-radius: 5px;
+            text-align: left;
+            white-space: pre-wrap;
+            word-break: break-all;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Node.js OTP Auth Server - External Client Demo</h1>
+        <p>This page demonstrates how an external client can interact with the authentication server API.</p>
+
+        <h2 class="section-title">1. Request OTP (Sign-up/First Login)</h2>
+        <p>Enter your details to receive a 6-digit OTP via email. After client-side OTP verification, your credentials will be securely saved to MongoDB.</p>
+        <form id="otpRequestForm">
+            <label for="email">Email Address:</label>
+            <input type="email" id="email" name="email" placeholder="your.email@example.com" required>
+            <label for="username">Username:</label>
+            <input type="text" id="username" name="username" placeholder="Choose a username" required>
+            <label for="password">Password:</label>
+            <input type="password" id="password" name="password" placeholder="Choose a password" required>
+            <button type="submit">Request OTP</button>
+        </form>
+        <div id="responseContainer">
+            <!-- The OTP form/modal will be injected here by the server's response -->
+        </div>
+    </div>
+
+    <div class="container">
+        <h2 class="section-title">2. Login (Existing User)</h2>
+        <p>Log in with your email and password if you already have an account (no OTP needed here for subsequent logins).</p>
+        <form id="loginForm">
+            <label for="loginEmail">Email Address:</label>
+            <input type="email" id="loginEmail" name="loginEmail" placeholder="your.email@example.com" required>
+            <label for="loginPassword">Password:</label>
+            <input type="password" id="loginPassword" name="loginPassword" placeholder="Your password" required>
+            <button type="submit">Login</button>
+        </form>
+        <div id="loginResponse"></div>
+    </div>
+
+    <div class="container">
+        <h2 class="section-title">3. Fetch All Users (Admin/Test)</h2>
+        <p>This endpoint fetches all stored user credentials from MongoDB. For demonstration ONLY.<br>
+           <b>WARNING: Do NOT use this endpoint in production environments without proper security!</b>
+        </p>
+        <button id="fetchUsersBtn">Fetch Users</button>
+        <div id="usersResponse"></div>
+    </div>
+
+    <div class="container">
+        <h2 class="section-title">4. Delete User (Admin/Test)</h2>
+        <p>Enter an email to delete the corresponding user from MongoDB. For demonstration ONLY.<br>
+           <b>WARNING: Do NOT use this endpoint in production environments without proper authentication!</b>
+        </p>
+        <form id="deleteUserForm">
+            <label for="deleteEmail">Email to Delete:</label>
+            <input type="email" id="deleteEmail" name="deleteEmail" placeholder="user.to.delete@example.com" required>
+            <button type="submit" style="background-color: #dc3545;">Delete User</button>
+        </form>
+        <div id="deleteResponse"></div>
+    </div>
+
+    <script>
+        // --- OTP Request Form Handler ---
+        document.getElementById('otpRequestForm').addEventListener('submit', async function(event) {
+            event.preventDefault();
+
+            const email = document.getElementById('email').value;
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const responseContainer = document.getElementById('responseContainer');
+
+            responseContainer.innerHTML = '<p class="loading-message">Sending OTP to your email... Please wait.</p>';
+
+            try {
+                const response = await fetch('/request-otp', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ email, username, password })
+                });
+
+                if (response.ok) {
+                    const htmlContent = await response.text();
+                    responseContainer.innerHTML = htmlContent;
+
+                    const scripts = responseContainer.querySelectorAll('script');
+                    scripts.forEach(s => {
+                        const script = document.createElement('script');
+                        Array.from(s.attributes).forEach(attr => script.setAttribute(attr.name, attr.value));
+                        script.textContent = s.textContent;
+                        document.body.appendChild(script);
+                    });
+
+                } else {
+                    const errorText = await response.text();
+                    responseContainer.innerHTML = `<p class="error-message">Error: ${errorText}</p>`;
+                }
+            } catch (error) {
+                console.error('Error requesting OTP:', error);
+                responseContainer.innerHTML = `<p class="error-message">Failed to connect to server for OTP request. Please check your internet connection or try again later.</p>`;
+            }
+        });
+
+        // --- Login Form Handler ---
+        document.getElementById('loginForm').addEventListener('submit', async function(event) {
+            event.preventDefault();
+
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+            const loginResponse = document.getElementById('loginResponse');
+
+            loginResponse.innerHTML = '<p class="loading-message">Logging in...</p>';
+
+            try {
+                const response = await fetch('/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    loginResponse.innerHTML = `<p class="success-message"><strong>${result.message}</strong> Welcome, ${result.username}!</p><p class="info-message">Logged in user: ${result.email}</p>`;
+                } else {
+                    loginResponse.innerHTML = `<p class="error-message">Error: ${result.message}</p>`;
+                }
+            } catch (error) {
+                console.error('Error during login:', error);
+                loginResponse.innerHTML = `<p class="error-message">Network error during login. Please try again.</p>`;
+            }
+        });
+
+        // --- Fetch Users Handler ---
+        document.getElementById('fetchUsersBtn').addEventListener('click', async function() {
+            const usersResponse = document.getElementById('usersResponse');
+            usersResponse.innerHTML = '<p class="loading-message">Fetching users...</p>';
+
+            try {
+                const response = await fetch('/users'); // GET request
+                const result = await response.json();
+
+                if (response.ok) {
+                    if (result.users && result.users.length > 0) {
+                        let userListHtml = '<h3>Registered Users:</h3><pre>';
+                        result.users.forEach(user => {
+                            userListHtml += `Email: ${user.email}\nUsername: ${user.username}\nCreated: ${user.createdAt}\nLast Verified: ${user.lastVerifiedAt}\nLast Login: ${user.lastLoginAt}\n\n`;
+                        });
+                        userListHtml += '</pre>';
+                        usersResponse.innerHTML = userListHtml;
+                    } else {
+                        usersResponse.innerHTML = '<p>No users registered yet.</p>';
+                    }
+                } else {
+                    usersResponse.innerHTML = `<p class="error-message">Error fetching users: ${result.message}</p>`;
+                }
+            } catch (error) {
+                console.error('Error fetching users:', error);
+                usersResponse.innerHTML = `<p class="error-message">Network error fetching users. Please try again.</p>`;
+            }
+        });
+
+        // --- Delete User Form Handler ---
+        document.getElementById('deleteUserForm').addEventListener('submit', async function(event) {
+            event.preventDefault();
+
+            const emailToDelete = document.getElementById('deleteEmail').value;
+            const deleteResponse = document.getElementById('deleteResponse');
+
+            deleteResponse.innerHTML = `<p class="loading-message">Deleting user ${emailToDelete}...</p>`;
+
+            try {
+                const response = await fetch(`/users/${emailToDelete}`, {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    deleteResponse.innerHTML = `<p class="success-message">${result.message}</p>`;
+                    document.getElementById('deleteEmail').value = '';
+                } else {
+                    deleteResponse.innerHTML = `<p class="error-message">Error: ${result.message}</p>`;
+                }
+            } catch (error) {
+                console.error('Error deleting user:', error);
+                deleteResponse.innerHTML = `<p class="error-message">Network error deleting user. Please try again.</p>`;
+            }
+        });
+    </script>
+</body>
+</html>

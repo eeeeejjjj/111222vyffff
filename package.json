@@ -1,0 +1,31 @@
+{
+  "name": "node-mongodb-otp-auth-server-api",
+  "version": "3.0.0",
+  "description": "Node.js authentication API server with OTP via email and MongoDB Atlas database.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "keywords": [
+    "node",
+    "express",
+    "authentication",
+    "otp",
+    "email",
+    "nodemailer",
+    "render",
+    "github",
+    "mongodb",
+    "database",
+    "api"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "mongodb": "^6.5.0",
+    "nodemailer": "^6.9.13"
+  }
+}
